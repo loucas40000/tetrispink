@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Scary Pink Tetris</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: linear-gradient(45deg, #ff69b4, #9370db, #ff1493, #8a2be2);
+            background-size: 400% 400%;
+            animation: gradientShift 10s ease infinite;
+            font-family: 'Courier New', monospace;
+            color: white;
+            overflow: hidden;
+            position: relative;
+        }
+
+        @keyframes gradientShift {
+            0%, 100% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+        }
+
+        .game-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 10px;
+            height: 100vh;
+            box-sizing: border-box;
+        }
+
+        .game-header {
+            text-align: center;
+            margin-bottom: 10px;
+        }
+
+        .game-title {
+            font-size: 24px;
+            font-weight: bold;
+            text-shadow: 3px 3px 6px rgba(0,0,0,0.5);
+            margin-bottom: 10px;
+        }
+
+        .score-display {
+            font-size: 18px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+        }
+
+        .game-board {
+            width: 300px;
+            height: 600px;
+            border: 3px solid #ff1493;
+            background: rgba(0,0,0,0.7);
+            position: relative;
+            box-shadow: 0 0 20px rgba(255,20,147,0.8);
+        }
+
+        .tetris-grid {
+            width: 100%;
+            height: 100%;
+            display: grid;
+            grid-template-columns: repeat(10, 1fr);
+            grid-template-rows: repeat(20, 1fr);
+        }
+
+        .cell {
+            border: 1px solid rgba(255,20,147,0.3);
+            box-sizing: border-box;
+        }
+
+        .cell.filled {
+            background: linear-gradient(45deg, #ff69b4, #9370db);
+            border: 2px solid #ff1493;
+        }
+
+        .controls {
+            margin-top: 15px;
+            text-align: center;
+        }
+
+        .control-btn {
+            background: linear-gradient(45deg, #ff69b4, #9370db);
+            border: none;
+            color: white;
+            padding: 15px 20px;
+            margin: 5px;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+            transition: all 0.2s;
+        }
+
+        .control-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 12px rgba(0,0,0,0.4);
+        }
+
+        .control-btn:active {
+            transform: translateY(0);
+        }
+
+        .screamer {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: red;
+            z-index: 9999;
+            display: none;
+            justify-content: center;
+            align-items: center;
+            font-size: 80px;
+            color: white;
+            text-shadow: 0 0 20px black;
+            animation: screamerFlash 0.1s infinite;
+        }
+
+        @keyframes screamerFlash {
+            0%, 100% { background: red; }
+            50% { background: darkred; }
+        }
+
+        .game-over {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0,0,0,0.9);
+            padding: 30px;
+            border-radius: 15px;
+            text-align: center;
+            display: none;
+            border: 3px solid #ff1493;
+        }
+
+        @media (max-width: 768px) {
+            .game-board {
+                width: 250px;
+                height: 500px;
+            }
+            .game-title {
+                font-size: 20px;
+            }
+            .control-btn {
+                padding: 12px 15px;
+                font-size: 14px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <div class="game-header">
+            <div class="game-title">LUMA - PINK TETRIS </div>
+            <div class="score-display">Score: <span id="score">0</span> | Lignes: <span id="lines">0</span></div>
+        </div>
+        
+        <div class="game-board">
+            <div class="tetris-grid" id="tetris-grid"></div>
+            <div class="game-over" id="game-over">
+                <h2>GAME OVER!</h2>
+                <p>Score Final: <span id="final-score">0</span></p>
+                <button class="control-btn" onclick="startGame()">Recommencer</button>
+            </div>
+        </div>
+        
+        <div class="controls">
+            <div>
+                <button class="control-btn" onclick="moveLeft()">◀</button>
+                <button class="control-btn" onclick="rotatePiece()">🔄</button>
+                <button class="control-btn" onclick="moveRight()">▶</button>
+            </div>
+            <div>
+                <button class="control-btn" onclick="dropPiece()">⬇ Drop</button>
+                <button class="control-btn" onclick="togglePause()">⏸ Pause</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="screamer" id="screamer">
+        <div id="screamer-text">👻 BOO! 👻</div>
+    </div>
+
+    <script>
+        const BOARD_WIDTH = 10;
+        const BOARD_HEIGHT = 20;
+        let board = [];
+        let currentPiece = null;
+        let currentX = 0;
+        let currentY = 0;
+        let score = 0;
+        let lines = 0;
+        let gameRunning = false;
+        let isPaused = false;
+        let dropInterval;
+        let screamerCount = 0;
+
+        // Sons de screamer (utilisation de l'API Web Audio)
+        const screamerSounds = ['👻 BOO!', '💀 AHHH!', '🧛 VAMPIRE!', '🎃 SURPRISE!', '👹 DEMON!', '🔪 SLASHER!'];
+
+        // Pièces Tetris
+        const pieces = [
+            // I
+            [[[1,1,1,1]]],
+            // O
+            [[[1,1],[1,1]]],
+            // T
+            [[[0,1,0],[1,1,1]], [[1,0],[1,1],[1,0]], [[1,1,1],[0,1,0]], [[0,1],[1,1],[0,1]]],
+            // S
+            [[[0,1,1],[1,1,0]], [[1,0],[1,1],[0,1]]],
+            // Z
+            [[[1,1,0],[0,1,1]], [[0,1],[1,1],[1,0]]],
+            // J
+            [[[1,0,0],[1,1,1]], [[1,1],[1,0],[1,0]], [[1,1,1],[0,0,1]], [[0,1],[0,1],[1,1]]],
+            // L
+            [[[0,0,1],[1,1,1]], [[1,0],[1,0],[1,1]], [[1,1,1],[1,0,0]], [[1,1],[0,1],[0,1]]]
+        ];
+
+        function initBoard() {
+            board = Array(BOARD_HEIGHT).fill().map(() => Array(BOARD_WIDTH).fill(0));
+            const grid = document.getElementById('tetris-grid');
+            grid.innerHTML = '';
+            
+            for (let i = 0; i < BOARD_HEIGHT * BOARD_WIDTH; i++) {
+                const cell = document.createElement('div');
+                cell.className = 'cell';
+                grid.appendChild(cell);
+            }
+        }
+
+        function drawBoard() {
+            const cells = document.querySelectorAll('.cell');
+            
+            for (let y = 0; y < BOARD_HEIGHT; y++) {
+                for (let x = 0; x < BOARD_WIDTH; x++) {
+                    const cell = cells[y * BOARD_WIDTH + x];
+                    if (board[y][x]) {
+                        cell.classList.add('filled');
+                    } else {
+                        cell.classList.remove('filled');
+                    }
+                }
+            }
+
+            // Dessiner la pièce courante
+            if (currentPiece) {
+                const shape = currentPiece.shape;
+                for (let y = 0; y < shape.length; y++) {
+                    for (let x = 0; x < shape[y].length; x++) {
+                        if (shape[y][x] && currentY + y >= 0 && currentY + y < BOARD_HEIGHT && 
+                            currentX + x >= 0 && currentX + x < BOARD_WIDTH) {
+                            const cell = cells[(currentY + y) * BOARD_WIDTH + (currentX + x)];
+                            cell.classList.add('filled');
+                        }
+                    }
+                }
+            }
+        }
+
+        function getRandomPiece() {
+            const pieceType = Math.floor(Math.random() * pieces.length);
+            const rotations = pieces[pieceType];
+            return {
+                type: pieceType,
+                rotation: 0,
+                shape: rotations[0]
+            };
+        }
+
+        function spawnPiece() {
+            currentPiece = getRandomPiece();
+            currentX = Math.floor(BOARD_WIDTH / 2) - Math.floor(currentPiece.shape[0].length / 2);
+            currentY = 0;
+            
+            if (collision()) {
+                gameOver();
+                return false;
+            }
+            return true;
+        }
+
+        function collision() {
+            if (!currentPiece) return false;
+            
+            for (let y = 0; y < currentPiece.shape.length; y++) {
+                for (let x = 0; x < currentPiece.shape[y].length; x++) {
+                    if (currentPiece.shape[y][x]) {
+                        const newX = currentX + x;
+                        const newY = currentY + y;
+                        
+                        if (newX < 0 || newX >= BOARD_WIDTH || newY >= BOARD_HEIGHT) {
+                            return true;
+                        }
+                        if (newY >= 0 && board[newY][newX]) {
+                            return true;
+                        }
+                    }
+                }
+            }
+            return false;
+        }
+
+        function placePiece() {
+            for (let y = 0; y < currentPiece.shape.length; y++) {
+                for (let x = 0; x < currentPiece.shape[y].length; x++) {
+                    if (currentPiece.shape[y][x]) {
+                        const newY = currentY + y;
+                        const newX = currentX + x;
+                        if (newY >= 0) {
+                            board[newY][newX] = 1;
+                        }
+                    }
+                }
+            }
+            
+            clearLines();
+            screamerCount++;
+            
+            // Déclencher un screamer de temps en temps
+            if (screamerCount % (Math.random() * 8 + 5) < 1) {
+                triggerScreamer();
+            }
+        }
+
+        function clearLines() {
+            let linesCleared = 0;
+            
+            for (let y = BOARD_HEIGHT - 1; y >= 0; y--) {
+                if (board[y].every(cell => cell === 1)) {
+                    board.splice(y, 1);
+                    board.unshift(Array(BOARD_WIDTH).fill(0));
+                    linesCleared++;
+                    y++; // Revérifier la même ligne
+                }
+            }
+            
+            if (linesCleared > 0) {
+                lines += linesCleared;
+                score += linesCleared * 100 * (linesCleared > 1 ? 2 : 1);
+                updateDisplay();
+            }
+        }
+
+        function triggerScreamer() {
+            if (isPaused || !gameRunning) return;
+            
+            const screamer = document.getElementById('screamer');
+            const screamerText = document.getElementById('screamer-text');
+            
+            screamerText.textContent = screamerSounds[Math.floor(Math.random() * screamerSounds.length)];
+            screamer.style.display = 'flex';
+            
+            // Effet sonore de substitution (vibration sur mobile)
+            if (navigator.vibrate) {
+                navigator.vibrate([100, 50, 100, 50, 200]);
+            }
+            
+            setTimeout(() => {
+                screamer.style.display = 'none';
+            }, 800);
+        }
+
+        function drop() {
+            if (!gameRunning || isPaused) return;
+            
+            currentY++;
+            if (collision()) {
+                currentY--;
+                placePiece();
+                if (!spawnPiece()) return;
+            }
+            drawBoard();
+        }
+
+        function moveLeft() {
+            if (!gameRunning || isPaused || !currentPiece) return;
+            currentX--;
+            if (collision()) currentX++;
+            drawBoard();
+        }
+
+        function moveRight() {
+            if (!gameRunning || isPaused || !currentPiece) return;
+            currentX++;
+            if (collision()) currentX--;
+            drawBoard();
+        }
+
+        function rotatePiece() {
+            if (!gameRunning || isPaused || !currentPiece) return;
+            
+            const rotations = pieces[currentPiece.type];
+            const nextRotation = (currentPiece.rotation + 1) % rotations.length;
+            const oldShape = currentPiece.shape;
+            
+            currentPiece.rotation = nextRotation;
+            currentPiece.shape = rotations[nextRotation];
+            
+            if (collision()) {
+                currentPiece.rotation = (nextRotation - 1 + rotations.length) % rotations.length;
+                currentPiece.shape = oldShape;
+            }
+            drawBoard();
+        }
+
+        function dropPiece() {
+            if (!gameRunning || isPaused || !currentPiece) return;
+            
+            while (!collision()) {
+                currentY++;
+            }
+            currentY--;
+            score += 5;
+            updateDisplay();
+            drawBoard();
+        }
+
+        function updateDisplay() {
+            document.getElementById('score').textContent = score;
+            document.getElementById('lines').textContent = lines;
+        }
+
+        function togglePause() {
+            if (!gameRunning) return;
+            
+            isPaused = !isPaused;
+            if (isPaused) {
+                clearInterval(dropInterval);
+            } else {
+                dropInterval = setInterval(drop, Math.max(100, 1000 - lines * 50));
+            }
+        }
+
+        function gameOver() {
+            gameRunning = false;
+            clearInterval(dropInterval);
+            document.getElementById('final-score').textContent = score;
+            document.getElementById('game-over').style.display = 'block';
+        }
+
+        function startGame() {
+            gameRunning = true;
+            isPaused = false;
+            score = 0;
+            lines = 0;
+            screamerCount = 0;
+            
+            document.getElementById('game-over').style.display = 'none';
+            updateDisplay();
+            initBoard();
+            spawnPiece();
+            drawBoard();
+            
+            clearInterval(dropInterval);
+            dropInterval = setInterval(drop, 1000);
+        }
+
+        // Contrôles tactiles et clavier
+        document.addEventListener('keydown', (e) => {
+            switch(e.key) {
+                case 'ArrowLeft': moveLeft(); break;
+                case 'ArrowRight': moveRight(); break;
+                case 'ArrowDown': drop(); break;
+                case 'ArrowUp': rotatePiece(); break;
+                case ' ': e.preventDefault(); dropPiece(); break;
+                case 'p': case 'P': togglePause(); break;
+            }
+        });
+
+        // Gestes tactiles
+        let touchStartX = 0;
+        let touchStartY = 0;
+
+        document.addEventListener('touchstart', (e) => {
+            touchStartX = e.touches[0].clientX;
+            touchStartY = e.touches[0].clientY;
+        });
+
+        document.addEventListener('touchend', (e) => {
+            if (!touchStartX || !touchStartY) return;
+            
+            const touchEndX = e.changedTouches[0].clientX;
+            const touchEndY = e.changedTouches[0].clientY;
+            
+            const deltaX = touchEndX - touchStartX;
+            const deltaY = touchEndY - touchStartY;
+            
+            if (Math.abs(deltaX) > Math.abs(deltaY)) {
+                if (deltaX > 30) moveRight();
+                else if (deltaX < -30) moveLeft();
+            } else {
+                if (deltaY > 30) drop();
+                else if (deltaY < -30) rotatePiece();
+            }
+            
+            touchStartX = 0;
+            touchStartY = 0;
+        });
+
+        // Démarrer le jeu automatiquement
+        window.addEventListener('load', startGame);
+    </script>
+</body>
+</html>
