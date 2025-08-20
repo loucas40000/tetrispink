@@ -43,12 +43,13 @@ body {
     font-size: clamp(18px,5vw,28px);
     font-weight: bold;
     text-shadow: 3px 3px 6px rgba(0,0,0,0.5);
+    margin-bottom: 5px;
 }
 
 .score-display {
     font-size: clamp(14px,4vw,20px);
     text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
-    margin-top: 5px;
+    margin-bottom: 15px;
 }
 
 .game-board {
@@ -72,27 +73,6 @@ body {
 .cell {border:1px solid rgba(255,20,147,0.3);}
 .cell.filled {background:linear-gradient(45deg,#ff69b4,#9370db);border:2px solid #ff1493;}
 
-.controls {
-    width: 100%;
-    padding: 5px 0;
-}
-
-.control-btn {
-    background:linear-gradient(45deg,#ff69b4,#9370db);
-    border:none; color:white;
-    padding:clamp(8px,3vw,15px) clamp(12px,4vw,20px);
-    margin:3px;
-    border-radius:10px;
-    font-size:clamp(12px,3.5vw,16px);
-    font-weight:bold;
-    cursor:pointer;
-    flex: 1;
-    min-width: 50px;
-    text-align: center;
-}
-.control-btn:hover {transform:translateY(-2px); box-shadow:0 6px 12px rgba(0,0,0,0.4);}
-.control-btn:active {transform:translateY(0);}
-
 .screamer {
     position:fixed;top:0;left:0;width:100vw;height:100vh;
     background:red; display:none;
@@ -115,22 +95,6 @@ body {
 }
 .game-over h2 {font-size:clamp(18px,5vw,24px); margin-bottom:15px;}
 .game-over p {font-size:clamp(14px,4vw,18px); margin-bottom:15px;}
-
-/* Footer mobile fixed */
-@media (max-width: 768px) {
-    .controls {
-        position: fixed;
-        bottom: 0;
-        left: 0;
-        background: rgba(0,0,0,0.5);
-        display: flex;
-        flex-direction: column;
-        padding: 10px 0;
-        z-index: 10;
-    }
-    .controls .d-flex {flex-wrap: wrap; justify-content: center;}
-    body {padding-bottom: 120px;} /* espace pour le footer */
-}
 </style>
 </head>
 <body>
@@ -138,7 +102,7 @@ body {
 <div class="container-fluid game-container">
     <div class="row justify-content-center w-100">
         <div class="col-12 col-md-8 col-lg-6 d-flex flex-column align-items-center">
-            <div class="game-header text-center mb-3">
+            <div class="game-header text-center">
                 <div class="game-title">PINK TETRIS</div>
                 <div class="score-display">Score: <span id="score">0</span> | Lignes: <span id="lines">0</span></div>
             </div>
@@ -148,22 +112,9 @@ body {
                 <div class="game-over" id="game-over">
                     <h2>GAME OVER!</h2>
                     <p>Score Final: <span id="final-score">0</span></p>
-                    <button class="btn control-btn" onclick="startGame()">Recommencer</button>
                 </div>
             </div>
         </div>
-    </div>
-</div>
-
-<div class="controls d-flex flex-column align-items-center mt-3 w-100">
-    <div class="d-flex justify-content-center gap-2 mb-2 w-100 flex-wrap">
-        <button class="btn control-btn" onclick="moveLeft()">◀</button>
-        <button class="btn control-btn" onclick="rotatePiece()">🔄</button>
-        <button class="btn control-btn" onclick="moveRight()">▶</button>
-    </div>
-    <div class="d-flex justify-content-center gap-2 w-100 flex-wrap">
-        <button class="btn control-btn" onclick="dropPiece()">⬇ Drop</button>
-        <button class="btn control-btn" onclick="togglePause()">⏸ Pause</button>
     </div>
 </div>
 
@@ -173,6 +124,7 @@ body {
 
 <!-- Bootstrap JS -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.2/js/bootstrap.bundle.min.js"></script>
+<script src="tetris.js"></script>
 
 <script src="tetris.js"></script>
     <script>
