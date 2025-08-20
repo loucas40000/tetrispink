@@ -2,12 +2,8 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Scary Pink Tetris</title>
-
-    <!-- Bootstrap CSS -->
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-pprn3073KE6tl6h4mWy8E6Nv4KwE0lAQ8HjP6iYu7U4v+0I4J8R8Jr63JRZ0yWfj" crossorigin="anonymous">
-
     <style>
         body {
             margin: 0;
@@ -19,6 +15,13 @@
             color: white;
             overflow: hidden;
             position: relative;
+            touch-action: manipulation;
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            -khtml-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+            user-select: none;
         }
 
         @keyframes gradientShift {
@@ -96,6 +99,8 @@
             cursor: pointer;
             box-shadow: 0 4px 8px rgba(0,0,0,0.3);
             transition: all 0.2s;
+            touch-action: manipulation;
+            -webkit-tap-highlight-color: transparent;
         }
 
         .control-btn:hover {
@@ -160,7 +165,7 @@
 <body>
     <div class="game-container">
         <div class="game-header">
-            <div class="game-title">LUMA - PINK TETRIS </div>
+            <div class="game-title">🌸 SCARY PINK TETRIS 💀</div>
             <div class="score-display">Score: <span id="score">0</span> | Lignes: <span id="lines">0</span></div>
         </div>
         
@@ -190,271 +195,359 @@
         <div id="screamer-text">👻 BOO! 👻</div>
     </div>
 
-    <!-- Bootstrap JS -->
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js" integrity="sha384-QgXkMBeUeN4wG3/+f5yq3OXlYJlWkqKz7o+1GHE8t6lqjQo2Xhg0E/0T3zLvB0EA" crossorigin="anonymous"></script>
+    <script>
+        const BOARD_WIDTH = 10;
+        const BOARD_HEIGHT = 20;
+        let board = [];
+        let currentPiece = null;
+        let currentX = 0;
+        let currentY = 0;
+        let score = 0;
+        let lines = 0;
+        let gameRunning = false;
+        let isPaused = false;
+        let dropInterval;
+        let screamerCount = 0;
 
-<script>
-const BOARD_WIDTH = 10;
-const BOARD_HEIGHT = 20;
-let board = [];
-let currentPiece = null;
-let currentX = 0;
-let currentY = 0;
-let score = 0;
-let lines = 0;
-let gameRunning = false;
-let isPaused = false;
-let dropInterval;
-let screamerCount = 0;
+        // Sons de screamer (utilisation de l'API Web Audio)
+        const screamerSounds = ['👻 BOO!', '💀 AHHH!', '🧛 VAMPIRE!', '🎃 SURPRISE!', '👹 DEMON!', '🔪 SLASHER!'];
 
-// Sons de screamer
-const screamerSounds = ['👻 BOO!', '💀 AHHH!', '🧛 VAMPIRE!', '🎃 SURPRISE!', '👹 DEMON!', '🔪 SLASHER!'];
+        // Pièces Tetris
+        const pieces = [
+            // I
+            [[[1,1,1,1]]],
+            // O
+            [[[1,1],[1,1]]],
+            // T
+            [[[0,1,0],[1,1,1]], [[1,0],[1,1],[1,0]], [[1,1,1],[0,1,0]], [[0,1],[1,1],[0,1]]],
+            // S
+            [[[0,1,1],[1,1,0]], [[1,0],[1,1],[0,1]]],
+            // Z
+            [[[1,1,0],[0,1,1]], [[0,1],[1,1],[1,0]]],
+            // J
+            [[[1,0,0],[1,1,1]], [[1,1],[1,0],[1,0]], [[1,1,1],[0,0,1]], [[0,1],[0,1],[1,1]]],
+            // L
+            [[[0,0,1],[1,1,1]], [[1,0],[1,0],[1,1]], [[1,1,1],[1,0,0]], [[1,1],[0,1],[0,1]]]
+        ];
 
-// Pièces Tetris
-const pieces = [
-    [[[1,1,1,1]]],                      // I
-    [[[1,1],[1,1]]],                    // O
-    [[[0,1,0],[1,1,1]], [[1,0],[1,1],[1,0]], [[1,1,1],[0,1,0]], [[0,1],[1,1],[0,1]]], // T
-    [[[0,1,1],[1,1,0]], [[1,0],[1,1],[0,1]]], // S
-    [[[1,1,0],[0,1,1]], [[0,1],[1,1],[1,0]]], // Z
-    [[[1,0,0],[1,1,1]], [[1,1],[1,0],[1,0]], [[1,1,1],[0,0,1]], [[0,1],[0,1],[1,1]]], // J
-    [[[0,0,1],[1,1,1]], [[1,0],[1,0],[1,1]], [[1,1,1],[1,0,0]], [[1,1],[0,1],[0,1]]]  // L
-];
-
-function initBoard() {
-    board = Array(BOARD_HEIGHT).fill().map(() => Array(BOARD_WIDTH).fill(0));
-    const grid = document.getElementById('tetris-grid');
-    grid.innerHTML = '';
-    
-    for (let i = 0; i < BOARD_HEIGHT * BOARD_WIDTH; i++) {
-        const cell = document.createElement('div');
-        cell.className = 'cell';
-        grid.appendChild(cell);
-    }
-}
-
-function drawBoard() {
-    const cells = document.querySelectorAll('.cell');
-    
-    for (let y = 0; y < BOARD_HEIGHT; y++) {
-        for (let x = 0; x < BOARD_WIDTH; x++) {
-            const cell = cells[y * BOARD_WIDTH + x];
-            if (board[y][x]) cell.classList.add('filled');
-            else cell.classList.remove('filled');
+        function initBoard() {
+            board = Array(BOARD_HEIGHT).fill().map(() => Array(BOARD_WIDTH).fill(0));
+            const grid = document.getElementById('tetris-grid');
+            grid.innerHTML = '';
+            
+            for (let i = 0; i < BOARD_HEIGHT * BOARD_WIDTH; i++) {
+                const cell = document.createElement('div');
+                cell.className = 'cell';
+                grid.appendChild(cell);
+            }
         }
-    }
 
-    if (currentPiece) {
-        const shape = currentPiece.shape;
-        for (let y = 0; y < shape.length; y++) {
-            for (let x = 0; x < shape[y].length; x++) {
-                if (shape[y][x] && currentY + y >= 0 && currentY + y < BOARD_HEIGHT && currentX + x >= 0 && currentX + x < BOARD_WIDTH) {
-                    const cell = cells[(currentY + y) * BOARD_WIDTH + (currentX + x)];
-                    cell.classList.add('filled');
+        function drawBoard() {
+            const cells = document.querySelectorAll('.cell');
+            
+            for (let y = 0; y < BOARD_HEIGHT; y++) {
+                for (let x = 0; x < BOARD_WIDTH; x++) {
+                    const cell = cells[y * BOARD_WIDTH + x];
+                    if (board[y][x]) {
+                        cell.classList.add('filled');
+                    } else {
+                        cell.classList.remove('filled');
+                    }
+                }
+            }
+
+            // Dessiner la pièce courante
+            if (currentPiece) {
+                const shape = currentPiece.shape;
+                for (let y = 0; y < shape.length; y++) {
+                    for (let x = 0; x < shape[y].length; x++) {
+                        if (shape[y][x] && currentY + y >= 0 && currentY + y < BOARD_HEIGHT && 
+                            currentX + x >= 0 && currentX + x < BOARD_WIDTH) {
+                            const cell = cells[(currentY + y) * BOARD_WIDTH + (currentX + x)];
+                            cell.classList.add('filled');
+                        }
+                    }
                 }
             }
         }
-    }
-}
 
-function getRandomPiece() {
-    const pieceType = Math.floor(Math.random() * pieces.length);
-    const rotations = pieces[pieceType];
-    return { type: pieceType, rotation: 0, shape: rotations[0] };
-}
+        function getRandomPiece() {
+            const pieceType = Math.floor(Math.random() * pieces.length);
+            const rotations = pieces[pieceType];
+            return {
+                type: pieceType,
+                rotation: 0,
+                shape: rotations[0]
+            };
+        }
 
-function spawnPiece() {
-    currentPiece = getRandomPiece();
-    currentX = Math.floor(BOARD_WIDTH / 2) - Math.floor(currentPiece.shape[0].length / 2);
-    currentY = 0;
-    
-    if (collision()) {
-        gameOver();
-        return false;
-    }
-    return true;
-}
+        function spawnPiece() {
+            currentPiece = getRandomPiece();
+            currentX = Math.floor(BOARD_WIDTH / 2) - Math.floor(currentPiece.shape[0].length / 2);
+            currentY = 0;
+            
+            if (collision()) {
+                gameOver();
+                return false;
+            }
+            return true;
+        }
 
-function collision() {
-    if (!currentPiece) return false;
-    
-    for (let y = 0; y < currentPiece.shape.length; y++) {
-        for (let x = 0; x < currentPiece.shape[y].length; x++) {
-            if (currentPiece.shape[y][x]) {
-                const newX = currentX + x;
-                const newY = currentY + y;
-                
-                if (newX < 0 || newX >= BOARD_WIDTH || newY >= BOARD_HEIGHT) return true;
-                if (newY >= 0 && board[newY][newX]) return true;
+        function collision() {
+            if (!currentPiece) return false;
+            
+            for (let y = 0; y < currentPiece.shape.length; y++) {
+                for (let x = 0; x < currentPiece.shape[y].length; x++) {
+                    if (currentPiece.shape[y][x]) {
+                        const newX = currentX + x;
+                        const newY = currentY + y;
+                        
+                        if (newX < 0 || newX >= BOARD_WIDTH || newY >= BOARD_HEIGHT) {
+                            return true;
+                        }
+                        if (newY >= 0 && board[newY][newX]) {
+                            return true;
+                        }
+                    }
+                }
+            }
+            return false;
+        }
+
+        function placePiece() {
+            for (let y = 0; y < currentPiece.shape.length; y++) {
+                for (let x = 0; x < currentPiece.shape[y].length; x++) {
+                    if (currentPiece.shape[y][x]) {
+                        const newY = currentY + y;
+                        const newX = currentX + x;
+                        if (newY >= 0) {
+                            board[newY][newX] = 1;
+                        }
+                    }
+                }
+            }
+            
+            clearLines();
+            screamerCount++;
+            
+            // Déclencher un screamer de temps en temps
+            if (screamerCount % (Math.random() * 8 + 5) < 1) {
+                triggerScreamer();
             }
         }
-    }
-    return false;
-}
 
-function placePiece() {
-    for (let y = 0; y < currentPiece.shape.length; y++) {
-        for (let x = 0; x < currentPiece.shape[y].length; x++) {
-            if (currentPiece.shape[y][x]) {
-                const newY = currentY + y;
-                const newX = currentX + x;
-                if (newY >= 0) board[newY][newX] = 1;
+        function clearLines() {
+            let linesCleared = 0;
+            
+            for (let y = BOARD_HEIGHT - 1; y >= 0; y--) {
+                if (board[y].every(cell => cell === 1)) {
+                    board.splice(y, 1);
+                    board.unshift(Array(BOARD_WIDTH).fill(0));
+                    linesCleared++;
+                    y++; // Revérifier la même ligne
+                }
+            }
+            
+            if (linesCleared > 0) {
+                lines += linesCleared;
+                score += linesCleared * 100 * (linesCleared > 1 ? 2 : 1);
+                updateDisplay();
             }
         }
-    }
-    
-    clearLines();
-    screamerCount++;
-    
-    if (screamerCount % (Math.random() * 8 + 5) < 1) triggerScreamer();
-}
 
-function clearLines() {
-    let linesCleared = 0;
-    
-    for (let y = BOARD_HEIGHT - 1; y >= 0; y--) {
-        if (board[y].every(cell => cell === 1)) {
-            board.splice(y, 1);
-            board.unshift(Array(BOARD_WIDTH).fill(0));
-            linesCleared++;
-            y++;
-        }
-    }
-    
-    if (linesCleared > 0) {
-        lines += linesCleared;
-        score += linesCleared * 100 * (linesCleared > 1 ? 2 : 1);
-        updateDisplay();
-    }
-}
-
-function triggerScreamer() {
-    if (isPaused || !gameRunning) return;
-    
-    const screamer = document.getElementById('screamer');
-    const screamerText = document.getElementById('screamer-text');
-    
-    screamerText.textContent = screamerSounds[Math.floor(Math.random() * screamerSounds.length)];
-    screamer.style.display = 'flex';
-    
-    if (navigator.vibrate) navigator.vibrate([100, 50, 100, 50, 200]);
-    
-    setTimeout(() => { screamer.style.display = 'none'; }, 800);
-}
-
-function drop() {
-    if (!gameRunning || isPaused) return;
-    
-    currentY++;
-    if (collision()) {
-        currentY--;
-        placePiece();
-        if (!spawnPiece()) return;
-    }
-    drawBoard();
-}
-
-function moveLeft() { if (!gameRunning || isPaused || !currentPiece) return; currentX--; if (collision()) currentX++; drawBoard(); }
-function moveRight() { if (!gameRunning || isPaused || !currentPiece) return; currentX++; if (collision()) currentX--; drawBoard(); }
-function rotatePiece() { 
-    if (!gameRunning || isPaused || !currentPiece) return;
-    const rotations = pieces[currentPiece.type];
-    const nextRotation = (currentPiece.rotation + 1) % rotations.length;
-    const oldShape = currentPiece.shape;
-    currentPiece.rotation = nextRotation;
-    currentPiece.shape = rotations[nextRotation];
-    if (collision()) { currentPiece.rotation = (nextRotation - 1 + rotations.length) % rotations.length; currentPiece.shape = oldShape; }
-    drawBoard();
-}
-function dropPiece() { 
-    if (!gameRunning || isPaused || !currentPiece) return;
-    while (!collision()) currentY++;
-    currentY--;
-    score += 5;
-    updateDisplay();
-    drawBoard();
-}
-
-function updateDisplay() { document.getElementById('score').textContent = score; document.getElementById('lines').textContent = lines; }
-
-function togglePause() {
-    if (!gameRunning) return;
-    isPaused = !isPaused;
-    if (isPaused) clearInterval(dropInterval);
-    else dropInterval = setInterval(drop, Math.max(100, 1000 - lines * 50));
-}
-
-function gameOver() {
-    gameRunning = false;
-    clearInterval(dropInterval);
-    document.getElementById('final-score').textContent = score;
-    document.getElementById('game-over').style.display = 'block';
-}
-
-function startGame() {
-    gameRunning = true;
-    isPaused = false;
-    score = 0;
-    lines = 0;
-    screamerCount = 0;
-    
-    document.getElementById('game-over').style.display = 'none';
-    updateDisplay();
-    initBoard();
-    spawnPiece();
-    drawBoard();
-    
-    clearInterval(dropInterval);
-    dropInterval = setInterval(drop, 1000);
-}
-
-// Clavier
-document.addEventListener('keydown', (e) => {
-    switch(e.key) {
-        case 'ArrowLeft': moveLeft(); break;
-        case 'ArrowRight': moveRight(); break;
-        case 'ArrowDown': drop(); break;
-        case 'ArrowUp': rotatePiece(); break;
-        case ' ': e.preventDefault(); dropPiece(); break;
-        case 'p': case 'P': togglePause(); break;
-    }
-});
-
-// Touch mobile (empêche zoom et gère gestes)
-let lastTouchEnd = 0;
-let touchStartX = 0;
-let touchStartY = 0;
-
-document.addEventListener('touchstart', function(e) {
-    if (e.touches.length > 1) e.preventDefault(); // pinch
-    touchStartX = e.touches[0].clientX;
-    touchStartY = e.touches[0].clientY;
-}, { passive: false });
-
-document.addEventListener('touchend', function(e) {
-    const now = (new Date()).getTime();
-    if (now - lastTouchEnd <= 300) e.preventDefault(); // double-tap
-    lastTouchEnd = now;
-
-    if (touchStartX && touchStartY) {
-        const touchEndX = e.changedTouches[0].clientX;
-        const touchEndY = e.changedTouches[0].clientY;
-        const deltaX = touchEndX - touchStartX;
-        const deltaY = touchEndY - touchStartY;
-        
-        if (Math.abs(deltaX) > Math.abs(deltaY)) {
-            if (deltaX > 30) moveRight();
-            else if (deltaX < -30) moveLeft();
-        } else {
-            if (deltaY > 30) drop();
-            else if (deltaY < -30) rotatePiece();
+        function triggerScreamer() {
+            if (isPaused || !gameRunning) return;
+            
+            const screamer = document.getElementById('screamer');
+            const screamerText = document.getElementById('screamer-text');
+            
+            screamerText.textContent = screamerSounds[Math.floor(Math.random() * screamerSounds.length)];
+            screamer.style.display = 'flex';
+            
+            // Effet sonore de substitution (vibration sur mobile)
+            if (navigator.vibrate) {
+                navigator.vibrate([100, 50, 100, 50, 200]);
+            }
+            
+            setTimeout(() => {
+                screamer.style.display = 'none';
+            }, 800);
         }
 
-        touchStartX = 0;
-        touchStartY = 0;
-    }
-}, { passive: false });
+        function drop() {
+            if (!gameRunning || isPaused) return;
+            
+            currentY++;
+            if (collision()) {
+                currentY--;
+                placePiece();
+                if (!spawnPiece()) return;
+            }
+            drawBoard();
+        }
 
-// Auto-start
-window.addEventListener('load', startGame);
-</script>
+        function moveLeft() {
+            if (!gameRunning || isPaused || !currentPiece) return;
+            currentX--;
+            if (collision()) currentX++;
+            drawBoard();
+        }
+
+        function moveRight() {
+            if (!gameRunning || isPaused || !currentPiece) return;
+            currentX++;
+            if (collision()) currentX--;
+            drawBoard();
+        }
+
+        function rotatePiece() {
+            if (!gameRunning || isPaused || !currentPiece) return;
+            
+            const rotations = pieces[currentPiece.type];
+            const nextRotation = (currentPiece.rotation + 1) % rotations.length;
+            const oldShape = currentPiece.shape;
+            
+            currentPiece.rotation = nextRotation;
+            currentPiece.shape = rotations[nextRotation];
+            
+            if (collision()) {
+                currentPiece.rotation = (nextRotation - 1 + rotations.length) % rotations.length;
+                currentPiece.shape = oldShape;
+            }
+            drawBoard();
+        }
+
+        function dropPiece() {
+            if (!gameRunning || isPaused || !currentPiece) return;
+            
+            while (!collision()) {
+                currentY++;
+            }
+            currentY--;
+            score += 5;
+            updateDisplay();
+            drawBoard();
+        }
+
+        function updateDisplay() {
+            document.getElementById('score').textContent = score;
+            document.getElementById('lines').textContent = lines;
+        }
+
+        function togglePause() {
+            if (!gameRunning) return;
+            
+            isPaused = !isPaused;
+            if (isPaused) {
+                clearInterval(dropInterval);
+            } else {
+                dropInterval = setInterval(drop, Math.max(100, 1000 - lines * 50));
+            }
+        }
+
+        function gameOver() {
+            gameRunning = false;
+            clearInterval(dropInterval);
+            document.getElementById('final-score').textContent = score;
+            document.getElementById('game-over').style.display = 'block';
+        }
+
+        function startGame() {
+            gameRunning = true;
+            isPaused = false;
+            score = 0;
+            lines = 0;
+            screamerCount = 0;
+            
+            document.getElementById('game-over').style.display = 'none';
+            updateDisplay();
+            initBoard();
+            spawnPiece();
+            drawBoard();
+            
+            clearInterval(dropInterval);
+            dropInterval = setInterval(drop, 1000);
+        }
+
+        // Contrôles tactiles et clavier
+        document.addEventListener('keydown', (e) => {
+            switch(e.key) {
+                case 'ArrowLeft': moveLeft(); break;
+                case 'ArrowRight': moveRight(); break;
+                case 'ArrowDown': drop(); break;
+                case 'ArrowUp': rotatePiece(); break;
+                case ' ': e.preventDefault(); dropPiece(); break;
+                case 'p': case 'P': togglePause(); break;
+            }
+        });
+
+        // Gestion tactile anti-zoom améliorée
+        let touchStartX = 0;
+        let touchStartY = 0;
+        let lastTouchTime = 0;
+
+        // Empêche le zoom par défaut
+        document.addEventListener('touchstart', function(e) {
+            if (e.touches.length > 1) {
+                e.preventDefault(); // Empêche le pinch-to-zoom
+                return false;
+            }
+            touchStartX = e.touches[0].clientX;
+            touchStartY = e.touches[0].clientY;
+        }, { passive: false });
+
+        document.addEventListener('touchmove', function(e) {
+            e.preventDefault(); // Empêche le scroll et autres gestes
+        }, { passive: false });
+
+        document.addEventListener('touchend', function(e) {
+            const currentTime = new Date().getTime();
+            const tapLength = currentTime - lastTouchTime;
+            
+            // Empêche le double-tap zoom
+            if (tapLength < 500 && tapLength > 0) {
+                e.preventDefault();
+            }
+            lastTouchTime = currentTime;
+
+            if (!touchStartX || !touchStartY) return;
+            
+            const touchEndX = e.changedTouches[0].clientX;
+            const touchEndY = e.changedTouches[0].clientY;
+            
+            const deltaX = touchEndX - touchStartX;
+            const deltaY = touchEndY - touchStartY;
+            
+            // Seuil plus élevé pour éviter les gestes accidentels
+            const threshold = 40;
+            
+            if (Math.abs(deltaX) > Math.abs(deltaY)) {
+                if (deltaX > threshold) moveRight();
+                else if (deltaX < -threshold) moveLeft();
+            } else {
+                if (deltaY > threshold) drop();
+                else if (deltaY < -threshold) rotatePiece();
+            }
+            
+            touchStartX = 0;
+            touchStartY = 0;
+        }, { passive: false });
+
+        // Empêche les gestes par défaut du navigateur
+        document.addEventListener('gesturestart', function(e) {
+            e.preventDefault();
+        });
+
+        document.addEventListener('gesturechange', function(e) {
+            e.preventDefault();
+        });
+
+        document.addEventListener('gestureend', function(e) {
+            e.preventDefault();
+        });
+
+        // Démarrer le jeu automatiquement
+        window.addEventListener('load', startGame);
+    </script>
+</body>
+</html>
